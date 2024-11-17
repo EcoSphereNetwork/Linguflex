@@ -30,8 +30,11 @@ apt-get update
 apt-get install -y \
     python3.12 \
     python3.12-venv \
+    python3.12-dev \
+    python3.12-distutils \
     python3-pip \
     python3-dev \
+    python3-setuptools \
     ffmpeg \
     portaudio19-dev \
     python3-pyqt6 \
@@ -43,20 +46,58 @@ apt-get install -y \
     git \
     build-essential \
     pkg-config \
-    cmake
+    cmake \
+    python3-wheel
 
 # Create and activate virtual environment
 echo -e "${YELLOW}Creating Python virtual environment...${NC}"
 python3.12 -m venv venv
 source venv/bin/activate
 
-# Upgrade pip
-echo -e "${YELLOW}Upgrading pip...${NC}"
-python3 -m pip install --upgrade pip
+# Set up Python environment
+echo -e "${YELLOW}Setting up Python environment...${NC}"
+pip install --upgrade pip setuptools wheel
 
-# Install Python dependencies
+# Install core build dependencies
+echo -e "${YELLOW}Installing core build dependencies...${NC}"
+pip install --no-cache-dir \
+    setuptools \
+    wheel \
+    Cython \
+    numpy==1.23.5
+
+# Install the rest of the requirements with error handling
 echo -e "${YELLOW}Installing Python dependencies...${NC}"
-pip install -r requirements_linux.txt
+if ! pip install -r requirements_linux.txt; then
+    echo -e "${RED}First attempt to install requirements failed. Trying alternative approach...${NC}"
+    # Try installing requirements one by one
+    while IFS= read -r requirement || [[ -n "$requirement" ]]; do
+        # Skip comments and empty lines
+        [[ $requirement =~ ^[[:space:]]*# ]] && continue
+        [[ -z "$requirement" ]] && continue
+        
+        echo -e "${YELLOW}Installing $requirement...${NC}"
+        if ! pip install --no-cache-dir "$requirement"; then
+            echo -e "${RED}Failed to install $requirement${NC}"
+            # Check if it's a critical package
+            case "$requirement" in
+                "numpy"*|"PyQt6"*|"RealtimeSTT"*|"RealtimeTTS"*|"setuptools"*|"wheel"*)
+                    echo -e "${RED}Critical package $requirement failed to install. Aborting.${NC}"
+                    exit 1
+                    ;;
+            esac
+        fi
+    done < requirements_linux.txt
+fi
+
+# Verify critical packages are installed
+echo -e "${YELLOW}Verifying critical packages...${NC}"
+for package in numpy PyQt6 RealtimeSTT RealtimeTTS; do
+    if ! pip show $package > /dev/null 2>&1; then
+        echo -e "${RED}Critical package $package is not installed. Installation failed.${NC}"
+        exit 1
+    fi
+done
 
 # Apply Linux compatibility patch
 echo -e "${YELLOW}Applying Linux compatibility patch...${NC}"
