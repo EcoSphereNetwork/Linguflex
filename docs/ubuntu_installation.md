@@ -16,7 +16,7 @@ This guide provides detailed instructions for installing and running Linguflex o
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/linguflex/Linguflex.git
+   git clone https://github.com/EcoSphereNetwork/Linguflex.git
    cd Linguflex
    ```
 
