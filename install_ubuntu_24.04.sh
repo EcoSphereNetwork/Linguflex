@@ -285,11 +285,78 @@ Type=Application
 Categories=Utility;
 EOL
 
-echo -e "${GREEN}Installation complete!${NC}"
-echo -e "${YELLOW}You can start Linguflex by:${NC}"
-echo "1. Running ./start_linux.sh from the terminal"
-echo "2. Using the Linguflex icon in your applications menu"
-echo -e "${YELLOW}Note: The first run might take longer as it initializes the models.${NC}"
+# Function to verify installation
+verify_installation() {
+    echo -e "${YELLOW}Verifying installation...${NC}"
+    local errors=0
+
+    # Check if virtual environment is active and working
+    if ! python3 -c "import sys; sys.exit(0 if sys.prefix != sys.base_prefix else 1)"; then
+        echo -e "${RED}Error: Virtual environment is not active${NC}"
+        errors=$((errors + 1))
+    fi
+
+    # Check critical Python packages
+    local packages=("numpy" "PyQt6" "RealtimeSTT" "RealtimeTTS" "torch" "transformers")
+    for package in "${packages[@]}"; do
+        if ! python3 -c "import $package" &> /dev/null; then
+            echo -e "${RED}Error: Package '$package' is not properly installed${NC}"
+            errors=$((errors + 1))
+        fi
+    done
+
+    # Check if models were downloaded
+    if [ ! -d "models" ]; then
+        echo -e "${RED}Error: Models directory not found${NC}"
+        errors=$((errors + 1))
+    fi
+
+    # Check desktop entry
+    if [ ! -f "/usr/share/applications/linguflex.desktop" ]; then
+        echo -e "${RED}Error: Desktop entry not created${NC}"
+        errors=$((errors + 1))
+    fi
+
+    # Check service file
+    if [ ! -f "/etc/systemd/system/linguflex@.service" ]; then
+        echo -e "${RED}Error: Systemd service file not installed${NC}"
+        errors=$((errors + 1))
+    fi
+
+    # Check file permissions
+    if [ ! -x "start_linux.sh" ]; then
+        echo -e "${RED}Error: start_linux.sh is not executable${NC}"
+        errors=$((errors + 1))
+    fi
+
+    if [ $errors -eq 0 ]; then
+        echo -e "${GREEN}Installation verification passed successfully!${NC}"
+        return 0
+    else
+        echo -e "${RED}Installation verification failed with $errors errors${NC}"
+        return 1
+    fi
+}
+
+# Run verification
+if ! verify_installation; then
+    echo -e "${RED}Installation completed with errors. Please check the messages above.${NC}"
+    echo -e "${YELLOW}You may need to run the following commands to fix issues:${NC}"
+    echo "1. sudo chmod +x start_linux.sh"
+    echo "2. sudo systemctl daemon-reload"
+    echo "3. Check logs in /var/log/linguflex/"
+else
+    echo -e "${GREEN}Installation completed successfully!${NC}"
+    echo -e "${YELLOW}You can start Linguflex by:${NC}"
+    echo "1. Running ./start_linux.sh from the terminal"
+    echo "2. Using the Linguflex icon in your applications menu"
+    echo "3. Starting as a service: sudo systemctl start linguflex@\$USER"
+    echo -e "\n${YELLOW}To enable Linguflex to start on boot:${NC}"
+    echo "sudo systemctl enable linguflex@\$USER"
+    echo -e "\n${YELLOW}To view logs:${NC}"
+    echo "tail -f /var/log/linguflex/linguflex.log"
+    echo -e "\n${YELLOW}Note: The first run might take longer as it initializes the models.${NC}"
+fi
 
 # Deactivate virtual environment
 deactivate
