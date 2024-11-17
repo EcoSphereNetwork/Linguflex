@@ -186,15 +186,24 @@ fi
 mkdir -p logs
 
 echo -e "${YELLOW}Installing system dependencies...${NC}"
-apt-get update
+
+# Add deadsnakes PPA if Python 3.12 is not available
+if ! command -v python3.12 &> /dev/null; then
+    echo -e "${YELLOW}Python 3.12 not found. Adding deadsnakes PPA...${NC}"
+    apt-get install -y software-properties-common
+    add-apt-repository -y ppa:deadsnakes/ppa
+    apt-get update
+fi
+
+# Install system dependencies
 apt-get install -y \
     python3.12 \
     python3.12-venv \
     python3.12-dev \
-    python3.12-distutils \
     python3-pip \
-    python3-dev \
     python3-setuptools \
+    python3-distutils-extra \
+    python3-wheel \
     ffmpeg \
     portaudio19-dev \
     python3-pyqt6 \
@@ -209,14 +218,44 @@ apt-get install -y \
     cmake \
     python3-wheel
 
+# Install distutils for Python 3.12
+echo -e "${YELLOW}Installing Python 3.12 distutils...${NC}"
+if ! curl -sSf https://bootstrap.pypa.io/get-pip.py | python3.12; then
+    echo -e "${RED}Failed to install pip for Python 3.12${NC}"
+    exit 1
+fi
+
+if ! python3.12 -m pip install setuptools distutils-extra; then
+    echo -e "${RED}Failed to install setuptools and distutils${NC}"
+    exit 1
+fi
+
 # Create and activate virtual environment
 echo -e "${YELLOW}Creating Python virtual environment...${NC}"
-python3.12 -m venv venv
-source venv/bin/activate
+if [ -d "venv" ]; then
+    echo -e "${YELLOW}Existing virtual environment found. Removing...${NC}"
+    rm -rf venv
+fi
+
+if ! python3.12 -m venv venv; then
+    echo -e "${RED}Failed to create virtual environment${NC}"
+    exit 1
+fi
+
+if ! source venv/bin/activate; then
+    echo -e "${RED}Failed to activate virtual environment${NC}"
+    exit 1
+fi
+
+# Verify virtual environment activation
+if [[ "$(which python)" != *"/venv/bin/python" ]]; then
+    echo -e "${RED}Virtual environment activation failed${NC}"
+    exit 1
+fi
 
 # Set up Python environment
 echo -e "${YELLOW}Setting up Python environment...${NC}"
-pip install --upgrade pip setuptools wheel
+pip install --upgrade pip setuptools wheel distutils-extra
 
 # Install core build dependencies
 echo -e "${YELLOW}Installing core build dependencies...${NC}"
