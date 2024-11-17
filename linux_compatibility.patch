@@ -1,0 +1,57 @@
+diff --git a/lingu/core/lingu.py b/lingu/core/lingu.py
+--- a/lingu/core/lingu.py
++++ b/lingu/core/lingu.py
+@@ -8,7 +8,7 @@ from lingu import cfg, log, notify, is_testmode
+ from .tools import Tools
+ import threading
+ import keyboard
+-import time
++import time, sys, os
+ 
+ class Lingu:
+     def __init__(self, app):
+@@ -31,7 +31,10 @@ class Lingu:
+         """
+         print("START")
+         self.app = app
+-        keyboard.on_press_key("esc", self.on_press)
++        if sys.platform.startswith('linux'):
++            keyboard.on_press_key("esc", self.on_press, suppress=False)
++        else:
++            keyboard.on_press_key("esc", self.on_press)
+         
+         events.add_listener(
+             "user_text_complete",
+@@ -89,6 +92,12 @@ class Lingu:
+         self.tools = Tools(self.modules.get_inference_objects())
+ 
++        # Set proper audio backend for Linux
++        if sys.platform.startswith('linux'):
++            os.environ['SDL_AUDIODRIVER'] = 'pulseaudio'
++            if 'DISPLAY' not in os.environ:
++                os.environ['DISPLAY'] = ':0'
++
+         self.main_worker = threading.Thread(
+             target=self._main_worker
+         )
+
+diff --git a/requirements_linux.txt b/requirements_linux.txt
+--- a/requirements_linux.txt
++++ b/requirements_linux.txt
+@@ -1,3 +1,7 @@
++# System dependencies (install via apt):
++# sudo apt-get install -y python3-dev python3-pip ffmpeg portaudio19-dev python3-pyqt6 libespeak-ng1 vlc libsndfile1 libasound2-dev pulseaudio
++
++# Python packages
+ RealtimeSTT==0.3.1
+ RealtimeTTS[all]==0.4.7
+ PyQt6-Fluent-Widgets==1.7.0
+@@ -130,3 +134,8 @@ open-interpreter==0.2.4
+ simpleaudio
+ python-xlib
+ 
++# Linux-specific packages
++python-sounddevice
++PyAudio
++python-vlc
++dbus-python

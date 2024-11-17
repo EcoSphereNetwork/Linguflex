@@ -1,0 +1,20 @@
+[Unit]
+Description=Linguflex AI Assistant
+After=network.target pulseaudio.service
+Wants=pulseaudio.service
+
+[Service]
+Type=simple
+User=%i
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/%i/.Xauthority
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+WorkingDirectory=/opt/linguflex
+ExecStart=/opt/linguflex/venv/bin/python -m lingu.core.run
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/linguflex/linguflex.log
+StandardError=append:/var/log/linguflex/error.log
+
+[Install]
+WantedBy=multi-user.target
