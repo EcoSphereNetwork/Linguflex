@@ -218,15 +218,19 @@ apt-get install -y \
     cmake \
     python3-wheel
 
-# Install distutils for Python 3.12
-echo -e "${YELLOW}Installing Python 3.12 distutils...${NC}"
-if ! curl -sSf https://bootstrap.pypa.io/get-pip.py | python3.12; then
-    echo -e "${RED}Failed to install pip for Python 3.12${NC}"
-    exit 1
-fi
+# Install Python 3.12 and required packages
+echo -e "${YELLOW}Installing Python 3.12 and dependencies...${NC}"
+apt-get install -y \
+    python3.12-full \
+    python3.12-venv \
+    python3-pip \
+    python3-setuptools \
+    python3-wheel \
+    python3-distutils-extra
 
-if ! python3.12 -m pip install setuptools distutils-extra; then
-    echo -e "${RED}Failed to install setuptools and distutils${NC}"
+# Verify Python installation
+if ! python3.12 --version; then
+    echo -e "${RED}Python 3.12 installation failed${NC}"
     exit 1
 fi
 
@@ -237,64 +241,100 @@ if [ -d "venv" ]; then
     rm -rf venv
 fi
 
-if ! python3.12 -m venv venv; then
+# Create virtual environment with system packages to avoid PEP 668 issues
+if ! python3.12 -m venv venv --system-site-packages; then
     echo -e "${RED}Failed to create virtual environment${NC}"
     exit 1
 fi
 
+# Activate virtual environment
 if ! source venv/bin/activate; then
     echo -e "${RED}Failed to activate virtual environment${NC}"
     exit 1
 fi
 
-# Verify virtual environment activation
+# Verify virtual environment
 if [[ "$(which python)" != *"/venv/bin/python" ]]; then
     echo -e "${RED}Virtual environment activation failed${NC}"
     exit 1
 fi
 
-# Set up Python environment
+echo -e "${GREEN}Python version in virtual environment:${NC}"
+python --version
+
+# Set up Python environment with system packages
 echo -e "${YELLOW}Setting up Python environment...${NC}"
-pip install --upgrade pip setuptools wheel distutils-extra
+python -m pip install --upgrade pip
 
 # Install core build dependencies
 echo -e "${YELLOW}Installing core build dependencies...${NC}"
-pip install --no-cache-dir \
+python -m pip install --no-cache-dir \
     setuptools \
     wheel \
+    distutils-extra \
     Cython \
     numpy==1.23.5
 
+# Verify pip installation
+if ! python -m pip --version; then
+    echo -e "${RED}Pip installation failed${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Pip version in virtual environment:${NC}"
+python -m pip --version
+
 # Install the rest of the requirements with error handling
 echo -e "${YELLOW}Installing Python dependencies...${NC}"
-if ! pip install -r requirements_linux.txt; then
-    echo -e "${RED}First attempt to install requirements failed. Trying alternative approach...${NC}"
-    # Try installing requirements one by one
+
+# First try: Install all requirements at once
+if ! python -m pip install -r requirements_linux.txt; then
+    echo -e "${YELLOW}Bulk installation failed. Trying sequential installation...${NC}"
+    
+    # Second try: Install requirements one by one
     while IFS= read -r requirement || [[ -n "$requirement" ]]; do
         # Skip comments and empty lines
         [[ $requirement =~ ^[[:space:]]*# ]] && continue
         [[ -z "$requirement" ]] && continue
         
         echo -e "${YELLOW}Installing $requirement...${NC}"
-        if ! pip install --no-cache-dir "$requirement"; then
-            echo -e "${RED}Failed to install $requirement${NC}"
-            # Check if it's a critical package
-            case "$requirement" in
-                "numpy"*|"PyQt6"*|"RealtimeSTT"*|"RealtimeTTS"*|"setuptools"*|"wheel"*)
-                    echo -e "${RED}Critical package $requirement failed to install. Aborting.${NC}"
-                    exit 1
-                    ;;
-            esac
+        if ! python -m pip install --no-cache-dir "$requirement"; then
+            # Third try: If package fails, try with --no-deps
+            echo -e "${YELLOW}Retrying $requirement with --no-deps...${NC}"
+            if ! python -m pip install --no-cache-dir --no-deps "$requirement"; then
+                echo -e "${RED}Failed to install $requirement${NC}"
+                
+                # Check if it's a critical package
+                case "$requirement" in
+                    "numpy"*|"PyQt6"*|"RealtimeSTT"*|"RealtimeTTS"*|"torch"*|"transformers"*)
+                        echo -e "${RED}Critical package $requirement failed to install. Aborting.${NC}"
+                        echo -e "${YELLOW}Try installing it manually with:${NC}"
+                        echo "python -m pip install $requirement"
+                        exit 1
+                        ;;
+                esac
+            fi
         fi
     done < requirements_linux.txt
+    
+    # Final try: Install dependencies that might have been skipped
+    echo -e "${YELLOW}Installing missing dependencies...${NC}"
+    if ! python -m pip install --no-cache-dir -r requirements_linux.txt; then
+        echo -e "${YELLOW}Some dependencies might be missing, but core packages are installed${NC}"
+    fi
 fi
 
-# Verify critical packages are installed
+# Verify critical packages
 echo -e "${YELLOW}Verifying critical packages...${NC}"
-for package in numpy PyQt6 RealtimeSTT RealtimeTTS; do
-    if ! pip show $package > /dev/null 2>&1; then
-        echo -e "${RED}Critical package $package is not installed. Installation failed.${NC}"
+critical_packages=("numpy" "PyQt6" "RealtimeSTT" "RealtimeTTS" "torch" "transformers")
+for package in "${critical_packages[@]}"; do
+    if ! python -c "import $package" &>/dev/null; then
+        echo -e "${RED}Critical package $package is not properly installed${NC}"
+        echo -e "${YELLOW}Try installing it manually with:${NC}"
+        echo "python -m pip install $package"
         exit 1
+    else
+        echo -e "${GREEN}✓ $package${NC}"
     fi
 done
 
