@@ -1,3 +1,12 @@
+# System dependencies (install via apt):
+# sudo apt-get install -y python3.12 python3.12-venv python3.12-dev python3.12-distutils python3-pip python3-dev python3-setuptools ffmpeg portaudio19-dev python3-pyqt6 libespeak-ng1 vlc libsndfile1 libasound2-dev pulseaudio git build-essential pkg-config cmake python3-wheel
+
+# Make sure pip, setuptools and wheel are up to date
+# python3.12 -m pip install --upgrade pip setuptools wheel
+
+# Python packages
+setuptools>=69.0.2
+wheel>=0.42.0
 RealtimeSTT==0.3.1
 RealtimeTTS[all]==0.4.7
 PyQt6-Fluent-Widgets==1.7.0
@@ -118,3 +127,9 @@ yt-dlp==2024.3.10
 open-interpreter==0.2.4
 simpleaudio
 python-xlib
+
+# Linux-specific packages
+python-sounddevice
+PyAudio
+python-vlc
+dbus-python
